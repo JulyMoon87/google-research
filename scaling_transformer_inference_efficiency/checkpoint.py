@@ -24,7 +24,7 @@ import copy
 from functools import partial  # pylint: disable=g-importing-member
 import os
 from typing import Any, NewType
-from typing import Optional
+from typing import Optional, Union
 
 from flax import serialization
 from flax import struct
@@ -32,7 +32,8 @@ from flax import traverse_util
 import jax
 import jax.numpy as jnp
 import numpy as np
-import seqio
+from seqio.vocabularies import SentencePieceVocabulary
+from seqio.vocabularies import Vocabulary
 import tensorstore
 
  import gfile
@@ -44,14 +45,28 @@ TsSpecDict = NewType('TsSpecDict', dict)
 @struct.dataclass
 class HParams:
   """Hyperparameters for a PaLM model."""
-  layers: int
-  embed: int
-  ff: int
-  heads: int
-  qkv: int
-  max_len: int  # Max length supported by attention
-  vocab: int
-  padded_heads: Optional[int] = 0  # modify norms when using padding partition
+  layers: int = struct.field(
+      pytree_node=False,
+  )
+  embed: int = struct.field(
+      pytree_node=False,
+  )
+  ff: int = struct.field(
+      pytree_node=False,
+  )
+  heads: int = struct.field(
+      pytree_node=False,
+  )
+  qkv: int = struct.field(
+      pytree_node=False,
+  )
+  max_len: int = struct.field(
+      pytree_node=False,
+  )
+  vocab: int = struct.field(
+      pytree_node=False,
+  )
+  padded_heads: Optional[int] = struct.field(pytree_node=False, default=0)
 
   @property
   def q_wi_per_head(self):
@@ -180,7 +195,7 @@ def flatten_state_dict(state_dict, keep_empty_nodes = False):
       sep='/')
 
 
-PyTreeDef = Any
+PyTree = Any
 FlatCheckpointDict = Any
 
 
@@ -260,11 +275,11 @@ class Checkpoint:
   Typically this is stored in host DRAM, or produced lazily as a
   tensorstore.Spec or a jax.ShapedArray.
   """
-  q_wi: np.ndarray
-  kv: np.ndarray
-  o_wo: np.ndarray
-  layernorm_scale: np.ndarray
-  embedding: np.ndarray
+  q_wi: Union[np.ndarray, jax.ShapedArray]
+  kv: Union[np.ndarray, jax.ShapedArray]
+  o_wo: Union[np.ndarray, jax.ShapedArray]
+  layernorm_scale: Union[np.ndarray, jax.ShapedArray]
+  embedding: Union[np.ndarray, jax.ShapedArray]
 
   @classmethod
   def make_shaped_arrays(cls, h):
@@ -336,14 +351,14 @@ class QuantizedCheckpoint:
 
   Separate quantized and non-quantized checkpoints to reduce code branching.
   """
-  q_wi: np.ndarray
-  q_wi_scale: np.ndarray
-  kv: np.ndarray
-  kv_scale: np.ndarray
-  o_wo: np.ndarray
-  o_wo_scale: np.ndarray
-  layernorm_scale: np.ndarray
-  embedding: np.ndarray
+  q_wi: Union[np.ndarray, jax.ShapedArray]
+  q_wi_scale: Union[np.ndarray, jax.ShapedArray]
+  kv: Union[np.ndarray, jax.ShapedArray]
+  kv_scale: Union[np.ndarray, jax.ShapedArray]
+  o_wo: Union[np.ndarray, jax.ShapedArray]
+  o_wo_scale: Union[np.ndarray, jax.ShapedArray]
+  layernorm_scale: Union[np.ndarray, jax.ShapedArray]
+  embedding: Union[np.ndarray, jax.ShapedArray]
 
   @classmethod
   def make_shaped_arrays(cls, h):

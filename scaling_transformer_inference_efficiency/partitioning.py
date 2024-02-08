@@ -21,14 +21,13 @@ from enum import Enum  # pylint: disable = g-importing-member
 import functools
 import math
 import threading
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union, cast
 
 import jax
 from jax import pxla
 from jax.experimental import mesh_utils
 from jax.experimental import pjit
 from jax.experimental.gda_serialization import serialization as jax_gda_serialization
-from jax.experimental.global_device_array import GlobalDeviceArray
 import jax.numpy as jnp
 from jax.sharding import Mesh
 from jax.sharding import NamedSharding
@@ -273,9 +272,10 @@ def copy_to_device(x, sharding,
   # If it's a tensorstore spec with an array() driver, it's already in host
   # memory. Convert it to np.ndarray and use that.
   if isinstance(x, tensorstore.Spec):
-    json = x.to_json()
+    spec = cast(tensorstore.Spec, x)
+    json = spec.to_json()
     if json.get('driver') == 'array':
-      x = tensorstore.open(x).result().read().result()
+      x = tensorstore.open(spec).result().read().result()
 
   assert x.shape == expected.shape, f'{x.shape} != {expected.shape}'
 
@@ -284,12 +284,7 @@ def copy_to_device(x, sharding,
     def cb(i):
       return jax.lax.convert_element_type(x[i], expected.dtype)
 
-    if jax.config.jax_array:
-      return jax.make_array_from_callback(x.shape, sharding, cb)
-    else:
-      result = GlobalDeviceArray.from_callback(x.shape, sharding.mesh,
-                                               sharding.spec, cb)
-      return result  # pytype: disable=bad-return-type
+    return jax.make_array_from_callback(x.shape, sharding, cb)
   elif isinstance(x, jax.ShapedArray):
 
     def sharded_zeros():
@@ -297,8 +292,8 @@ def copy_to_device(x, sharding,
 
     with sharding.mesh:
       return pjit.pjit(
-          sharded_zeros, in_axis_resources=(),
-          out_axis_resources=sharding.spec)()
+          sharded_zeros, in_shardings=(), out_shardings=sharding.spec
+      )()
   elif isinstance(x, tensorstore.Spec):
     if jax.config.read('jax_xla_backend') == 'pathways':
 
@@ -365,9 +360,14 @@ def get_sharding_divisor_outside_manual(mesh, dimensions):
 def safe_sharding(tensor, sharding, mesh):
   """If something is to be sharded by more than it's size, do not shard."""
   if sharding is None: return None
-  if sharding is P(None,): return sharding
-  if sharding is P(None): return sharding
-  if sharding is P(): return sharding
+  if sharding == P(
+      None,
+  ):
+    return sharding
+  if sharding == P(None):
+    return sharding
+  if sharding == P():
+    return sharding
   shape = tensor.shape
   sharding_size = [
       get_sharding_divisor_outside_manual(mesh, dim) for dim in sharding

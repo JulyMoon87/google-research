@@ -22,13 +22,12 @@ from typing import Any, Callable, Iterable, Optional, Sequence, Tuple
 
 import flax
 import jax
-from jax.lib import xla_client
 import jax.numpy as jnp
 import numpy as np
 
 # Type Stubs
 ParamTree = Any
-PyTreeDef = Any
+PyTreeDef = jax.tree_util.PyTreeDef
 
 
 def scatter_nd(indices, updates,

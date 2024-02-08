@@ -40,13 +40,16 @@ ten columns, one line per marked error:
 - **target**: Translated text for segment.
 - **category**: MQM error category (or "no-error").
 - **severity**: MQM error severity (or "no-error").
-- **metadata**: JSON-formatted object that may contain the following fields, among others:
+- **metadata**: JSON-formatted object that may contain the following fields,
+  among others:
   - **timestamp**: Time at which this annotation was obtained (milliseconds
     since Unix epoch)
   - **note**: Free-form text note provided by the rater with some annotations
     (notably, with the "Other" error category)
   - **corrected_translation**: If the rater provided a corrected translation,
     for the segment, it will be included here.
+  - **source_not_seen**: This will be set to true if this annotation was marked
+    without the source text of the segment being visible.
   - **source_spans**: Array of pairs of 0-based indices (usually just one)
     identifying the indices of the first and last source tokens in the marked
     span. These indices refer to the source_tokens array in the segment
@@ -66,16 +69,27 @@ ten columns, one line per marked error:
         required if "references" is present.
       - **source_tokens**: An array of source text tokens.
       - **target_tokens**: An array of target text tokens.
+      - **source_sentence_tokens**: An array specifying sentence segmentation
+        in the source segment. Each entry is the number of tokens in one
+        sentence.
+      - **target_sentence_tokens**: An array specifying sentence segmentation
+        in the target segment. Each entry is the number of tokens in one
+        sentence.
       - **starts_paragraph**: A boolean that is true if this segment is the
         start of a new paragraph.
       - In addition, any text annotation fields present in the input data are
         copied here. In [Anthea's data format](https://github.com/google-research/google-research/blob/master/anthea/anthea-help.html),
         this would be all the fields present in the optional last column.
+  - **feedback**: An object optionally present in the metadata of the first
+    segment of a doc. This captures any feedback the rater may have provided.
+    It can include a free-form text field (keyed by **notes**) and a string
+    keyed by **thumbs** that is set to either "up" or "down".
   - **evaluation**: An object that has information about the evaluation used.
     This field is typically only present in the very first data row, and is
     not repeated, in order to save space. This object may contain the following
     fields:
-      - **template**: The name of the template used ("MQM", or "MQM-WebPage",             etc.)
+      - **template**: The name of the template used ("MQM", "MQM-WebPage",
+        etc.).
       - **config**: The configuration parameters that define the template. This
         includes "errors" and "severities". Some bulky fields, notably
         "instructions" and "description" may have been stripped out from this
@@ -109,7 +123,7 @@ filters.
     involving the columns. It can use the following
     variables: **system**, **doc**, **docSegId**,
     **globalSegId**, **rater**, **category**, **severity**,
-    **source**, **target**.
+    **source**, **target**, **metadata**.
   - Filter expressions also have access to an aggregated **segment**
     variable that is an object with the following properties:
     **segment.catsBySystem**,
@@ -123,6 +137,9 @@ filters.
     "Minor/Fluency/Punctuation" or are just the same as severities if
     categories are empty. This segment-level aggregation allows you
     to select specific segments rather than just specific error ratings.
+  - The segment object also includes a **segment.document** object with the
+    following properties:
+    **doc**, **thumbsUpCount**, **thumbsDownCount**.
   - **Example**: globalSegId > 10 || severity == 'Major'
   - **Example**: target.indexOf('thethe') >= 0
   - **Example**: segment.sevsBySystem['System-42'].includes('Major')

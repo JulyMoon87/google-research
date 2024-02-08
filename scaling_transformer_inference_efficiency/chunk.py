@@ -99,7 +99,7 @@ import jax.numpy as jnp
 import jax.scipy
 from jax.sharding import PartitionSpec as P
 import numpy as np
-import seqio
+from seqio.vocabularies import Vocabulary
 import typing_extensions
 
 from scaling_transformer_inference_efficiency import attention
@@ -120,7 +120,7 @@ class Chunk:
 
   @classmethod
   def logical_axes(cls):
-    return Chunk(
+    return Chunk(  # pytype: disable=wrong-arg-types  # jax-ndarray
         tokens=P('batch', 'time'),
         lengths=P('batch'),
     )
@@ -287,7 +287,11 @@ class Chunk:
     # end-of-sequence token.
     masked_tokens = np.where(
         np.array(me.token_mask), np.array(me.tokens), vocab.eos_id)
-    return list(vocab.decode_tf(masked_tokens).numpy())
+    decoded = vocab.decode_tf(masked_tokens)
+    if hasattr(decoded, 'numpy'):
+      return list(vocab.decode_tf(masked_tokens).numpy())
+    else:
+      return list(vocab.decode_tf(masked_tokens))
 
   @property
   def token_mask(self):
@@ -342,7 +346,7 @@ class ChunkResult:
 
   @classmethod
   def logical_axes(cls, circular=False):
-    return ChunkResult(
+    return ChunkResult(  # pytype: disable=wrong-arg-types  # jax-ndarray
         per_token_scores=P('batch', 'time'),
         top_token_ids=P('batch', 'time', 'top_k'),
         top_token_probs=P('batch', 'time', 'top_k'),
@@ -439,7 +443,7 @@ class FullChunkResult:
 
   @classmethod
   def logical_axes(cls):
-    return FullChunkResult(
+    return FullChunkResult(  # pytype: disable=wrong-arg-types  # jax-ndarray
         logits=P('logit_batch', 'time', 'vocab'),
         kv_cache=attention.KVCache.logical_axes(),
     )
